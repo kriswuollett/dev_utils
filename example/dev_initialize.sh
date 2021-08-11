@@ -17,11 +17,20 @@
 
 set -e
 
-source ../env_helper.sh
+source ../wait_for_it.sh
 
-init_dirs
+echo "Bringing up development database_initialization stack ..."
+docker-compose --profile database_initialization up -d --build
+wait_for_docker_container_port db1 5432
+docker-compose run db1-migrations
+docker-compose --profile development up -d --build
+wait_for_docker_container_port backend 8080
 
-add_password db1_postgres_password
-add_env db1_publish_port "${DB1_PUBLISH_PORT:-5433}"
-
-build_env
+echo -n "Verifying that backend is ready ... "
+docker exec -it backend \
+    curl --silent --fail --show-error -u "kris:$(<.secrets/backend_kris_password)" \
+    "http://localhost:8080/_healthcheck" 1>/dev/null &&
+    echo -e "${GREEN}done${NC}" || {
+    echo -e "${RED}failed${NC}"
+    return 1
+}

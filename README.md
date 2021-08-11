@@ -1,6 +1,6 @@
 # env_helper
 
-Simply build environment files for development purposes with `env_helper`. It easily generates
+Simply build environment for development purposes with `env_helper`. It easily generates
 typed password files that can be loaded into platforms like Docker as secrets data.
 
 ## Usage
