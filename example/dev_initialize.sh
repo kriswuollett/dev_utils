@@ -17,20 +17,30 @@
 
 set -e
 
-source ../wait_for_it.sh
+source ../docker_helper.sh
 
 echo "Bringing up development database_initialization stack ..."
 docker-compose --profile database_initialization up -d --build
 wait_for_docker_container_port db1 5432
 docker-compose run db1-migrations
-docker-compose --profile development up -d --build
-wait_for_docker_container_port backend 8080
 
-echo -n "Verifying that backend is ready ... "
-docker exec -it backend \
-    curl --silent --fail --show-error -u "kris:$(<.secrets/backend_kris_password)" \
-    "http://localhost:8080/_healthcheck" 1>/dev/null &&
-    echo -e "${GREEN}done${NC}" || {
-    echo -e "${RED}failed${NC}"
-    return 1
-}
+set_elasticsearch_bootstrap_password es1 $(<.secrets/elastic_bootstrap_password)
+docker-compose --profile database_initialization restart
+wait_for_docker_container_port es1 9200
+
+elasticsearch_change_user_password es1 \
+    elastic $(<.secrets/elastic_bootstrap_password) \
+    elastic $(<.secrets/elastic_password)
+elasticsearch_add_user es1 \
+    elastic $(<.secrets/elastic_password) \
+    www_viewer $(<.secrets/elastic_www_viewer_password) \
+    viewer
+
+elasticsearch_verify_user_password es1 \
+    elastic $(<.secrets/elastic_password)
+elasticsearch_verify_user_password es1 \
+    www_viewer $(<.secrets/elastic_www_viewer_password)
+
+echo "Bringing up development full stack ..."
+docker-compose --profile full up -d --build
+wait_for_docker_container_port backend 8080
