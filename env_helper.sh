@@ -18,31 +18,64 @@ declare -a ADJECTIVES=(able above absolute accepted accurate ace active actual a
 
 declare -a ANIMALS=(aardvark adder airedale akita albacore alien alpaca amoeba anchovy anemone ant anteater antelope ape aphid arachnid asp baboon badger barnacle basilisk bass bat beagle bear bedbug bee beetle bengal bird bison blowfish bluebird bluegill bluejay boa boar bobcat bonefish boxer bream buck buffalo bug bull bulldog bullfrog bunny burro buzzard caiman calf camel cardinal caribou cat catfish cattle chamois cheetah chicken chigger chimp chipmunk chow cicada civet clam cobra cockatoo cod collie colt condor coral corgi cougar cow cowbird coyote crab crane crappie crawdad crayfish cricket crow cub dane dassie deer dingo dinosaur doberman dodo doe dog dogfish dolphin donkey dory dove dragon dragonfly drake drum duck duckling eagle earwig eel eft egret elephant elf elk emu escargot ewe falcon fawn feline ferret filly finch firefly fish flamingo flea flounder fly foal fowl fox foxhound frog gannet gar garfish gator gazelle gecko gelding ghost ghoul gibbon giraffe glider glowworm gnat gnu goat gobbler goblin goldfish goose gopher gorilla goshawk grackle griffon grizzly grouper grouse grub grubworm guinea gull guppy haddock hagfish halibut hamster hare hawk hedgehog hen hermit heron herring hippo hog honeybee hookworm hornet horse hound humpback husky hyena hyrax ibex iguana imp impala insect jackal jackass jaguar javelin jawfish jay jaybird jennet joey kangaroo katydid kid killdeer kingfish kit kite kitten kiwi koala kodiak koi krill lab labrador lacewing ladybird ladybug lamb lamprey lark leech lemming lemur leopard liger lion lioness lionfish lizard llama lobster locust longhorn loon lorid louse lynx lyrebird macaque macaw mackerel maggot magpie mako malamute mallard mammal mammoth man manatee mantis marlin marmoset marmot marten martin mastiff mastodon mayfly meerkat midge mink minnow mite moccasin mole mollusk molly monarch mongoose mongrel monitor monkey monkfish monster moose moray mosquito moth mouse mudfish mule mullet muskox muskrat mustang mutt narwhal newt oarfish ocelot octopus opossum orca oriole oryx osprey ostrich owl ox oyster panda pangolin panther parakeet parrot peacock pegasus pelican penguin perch pheasant phoenix pig pigeon piglet pika pipefish piranha platypus polecat polliwog pony poodle porpoise possum prawn primate pug puma pup python quagga quail quetzal rabbit raccoon racer ram raptor rat rattler raven ray redbird redfish reindeer reptile rhino ringtail robin rodent rooster roughy sailfish salmon satyr sawfish sawfly scorpion sculpin seagull seahorse seal seasnail serval shad shark sheep sheepdog shepherd shiner shrew shrimp silkworm skink skunk skylark sloth slug snail snake snapper snipe sole spaniel sparrow spider sponge squid squirrel stag stallion starfish starling stingray stinkbug stork stud sturgeon sunbeam sunbird sunfish swan swift swine tadpole tahr tapir tarpon teal termite terrapin terrier tetra thrush tick tiger titmouse toad tomcat tortoise toucan treefrog troll trout tuna turkey turtle unicorn urchin vervet viper vulture wahoo wallaby walleye walrus warthog wasp weasel weevil werewolf whale whippet wildcat wolf wombat woodcock worm wren yak yeti zebra)
 
+_ENV_FILE=".env"
+_ENV_VARS_BUILD_PATH=".env.variables"
+_ENV_SECRETS_BUILD_PATH=".env.secrets"
+_EXISTING_SECRETS_PATH=".secrets"
+
 function init_dirs {
-    touch .env
-    mkdir -p .env.d
-    mkdir -p .secrets
+    touch "./${_ENV_FILE}"
+    mkdir -p "./${_ENV_VARS_BUILD_PATH}" "./${_ENV_SECRETS_BUILD_PATH}"
 }
 
 function build_env {
-    cat ./.env.d/* >.env || true
+    rm -f "./${_ENV_FILE}"
+    for env_file in "./${_ENV_VARS_BUILD_PATH}/"*; do
+        filename=$(basename ${env_file})
+        echo "${filename}=$(<${env_file})" >>.env
+    done
+    for secret_file in "./${_ENV_SECRETS_BUILD_PATH}/"*; do
+        filename=$(basename ${secret_file})
+        echo "${filename}_file=/run/secrets/${filename}" >>.env
+        echo "${filename}_workspace_file=.env.secrets/${filename}" >>.env
+    done
+    sort -k 1 -t = -o .env .env
 }
 
 function clear_env {
-    rm -f ./.env
-    rm -rf ./.env.d
-    rm -rf ./.secrets
+    rm -f "./${_ENV_FILE}"
+    rm -rf "./${_ENV_VARS_BUILD_PATH}"
+    rm -rf "./${_ENV_SECRETS_BUILD_PATH}"
 }
 
 function add_env {
-    if [[ ! -f ".env.d/$1" ]]; then
-        echo "$1=$2" >".env.d/$1"
-    fi
+    echo -n "$2" >"./${_ENV_VARS_BUILD_PATH}/$1"
 }
 
-function add_password {
-    if [[ ! -f ".secrets/$1" ]]; then
-        echo -n "${ADJECTIVES[$(($RANDOM % ${#ADJECTIVES[@]}))]}-${ANIMALS[$(($RANDOM % ${#ANIMALS[@]}))]}" >".secrets/$1"
+# Makes both a regular variable as well as a file with the secret contents.
+# The variable version is useful when a container image doesn't support a
+# *_FILE version of environment variables. This method should not be used
+# when the secret content is not "text".
+#
+# Does not regenerate the secret if .env.secrets/$1 already exists which
+# prevents issues when rebuilding locally.
+function add_secret_text {
+    if [[ ! -f "./${_ENV_SECRETS_BUILD_PATH}/$1" ]]; then
+        echo -n "$2" >"./${_ENV_SECRETS_BUILD_PATH}/$1"
     fi
-    add_env "$1_file" ".secrets/$1"
+    add_env "$1" "$2"
+}
+
+function map_existing_secret_text {
+    if [[ ! -f "./${_EXISTING_SECRETS_PATH}/$1" ]]; then
+        echo "Existing secret file not found at ${_EXISTING_SECRETS_PATH}/$1."
+        echo "Copy the secret text, then:"
+        echo "- on macOS run in Terminal: pbpaste >${_EXISTING_SECRETS_PATH}/$1"
+        exit 1
+    fi
+    add_secret_text $2 $(<"${_EXISTING_SECRETS_PATH}/$1")
+}
+
+function generate_password {
+    add_secret_text $1 "${ADJECTIVES[$(($RANDOM % ${#ADJECTIVES[@]}))]}-${ANIMALS[$(($RANDOM % ${#ANIMALS[@]}))]}"
 }
