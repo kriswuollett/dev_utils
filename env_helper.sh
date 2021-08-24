@@ -36,8 +36,8 @@ function build_env {
     done
     for secret_file in "./${_ENV_SECRETS_BUILD_PATH}/"*; do
         filename=$(basename ${secret_file})
-        echo "${filename}_file=/run/secrets/${filename}" >>.env
-        echo "${filename}_workspace_file=.env.secrets/${filename}" >>.env
+        echo "${filename}_FILE=/run/secrets/${filename}" >>.env
+        echo "${filename}_WORKSPACE_FILE=.env.secrets/${filename}" >>.env
     done
     sort -k 1 -t = -o .env .env
 }
