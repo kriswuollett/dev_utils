@@ -23,9 +23,24 @@ _ENV_VARS_BUILD_PATH=".env.variables"
 _ENV_SECRETS_BUILD_PATH=".env.secrets"
 _EXISTING_SECRETS_PATH=".secrets"
 
+# If LOCAL_WORKSPACE_FOLDER is set, we are running in vscode dev container.
+# If not, then _WORKSPACE_PATH to Docker bind mounts should be relative.
+_WORKSPACE_PATH="${LOCAL_WORKSPACE_FOLDER}/"
+if [[ "x${_WORKSPACE_PATH}" == "x/" ]]; then
+    _WORKSPACE_PATH=""
+fi
+
 function init_dirs {
     touch "./${_ENV_FILE}"
     mkdir -p "./${_ENV_VARS_BUILD_PATH}" "./${_ENV_SECRETS_BUILD_PATH}"
+
+    # If LOCAL_WORKSPACE_FOLDER is set, we are running in a vscode dev
+    # container. In that case create a symlink to /workspace so that
+    # Docker does not complain about missing secret files.
+    if [[ "${LOCAL_WORKSPACE_FOLDER}x" != "x" ]]; then
+        sudo mkdir -p $(dirname ${LOCAL_WORKSPACE_FOLDER})
+        sudo ln -s /workspaces/$(basename ${LOCAL_WORKSPACE_FOLDER}) ${LOCAL_WORKSPACE_FOLDER}
+    fi
 }
 
 function build_env {
@@ -37,7 +52,7 @@ function build_env {
     for secret_file in "./${_ENV_SECRETS_BUILD_PATH}/"*; do
         filename=$(basename ${secret_file})
         echo "${filename}_FILE=/run/secrets/${filename}" >>.env
-        echo "${filename}_WORKSPACE_FILE=.env.secrets/${filename}" >>.env
+        echo "${filename}_WORKSPACE_FILE=${_WORKSPACE_PATH}.env.secrets/${filename}" >>.env
     done
     sort -k 1 -t = -o .env .env
 }
