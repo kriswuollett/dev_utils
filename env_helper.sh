@@ -23,6 +23,11 @@ _ENV_VARS_BUILD_PATH=".env.variables"
 _ENV_SECRETS_BUILD_PATH=".env.secrets"
 _EXISTING_SECRETS_PATH=".secrets"
 
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+_CACHE_PATH=".cache"
+
 # If LOCAL_WORKSPACE_FOLDER is set, we are running in vscode dev container.
 # If not, then _WORKSPACE_PATH to Docker bind mounts should be relative.
 _WORKSPACE_PATH="${LOCAL_WORKSPACE_FOLDER}/"
@@ -82,6 +87,24 @@ function add_secret_text {
     fi
     add_env "$1" "$2"
 }
+
+function fetch_file {
+    URL="$2"
+    FILENAME="$(echo ${URL} | grep / | cut -d/ -f3-)"
+    CACHED_FILE=${_CACHE_PATH}/${FILENAME}
+    if [[ ! -f "${CACHED_FILE}" ]]; then
+        echo -n "Fetching ${URL} ... "
+        wget -P ${_CACHE_PATH} -x ${URL} 1>/dev/null &&
+            echo -e "${GREEN}done${NC}" || {
+                echo -e "${RED}failed${NC}" 
+                return 1
+            }
+        add_env "$1_WORKSPACE_FILE" "${CACHED_FILE}" 
+    else
+        echo "File ${URL} already cached. "
+    fi
+}
+
 
 function map_existing_secret_text {
     if [[ ! -f "./${_EXISTING_SECRETS_PATH}/$1" ]]; then
