@@ -38,8 +38,10 @@ function init_dirs {
     # container. In that case create a symlink to /workspace so that
     # Docker does not complain about missing secret files.
     if [[ "${LOCAL_WORKSPACE_FOLDER}x" != "x" ]]; then
-        sudo mkdir -p $(dirname ${LOCAL_WORKSPACE_FOLDER})
-        sudo ln -s /workspaces/$(basename ${LOCAL_WORKSPACE_FOLDER}) ${LOCAL_WORKSPACE_FOLDER}
+        if [[ ! -d "$(dirname ${LOCAL_WORKSPACE_FOLDER})" ]]; then
+            sudo mkdir -p "$(dirname ${LOCAL_WORKSPACE_FOLDER})"
+            sudo ln -sf "/workspaces/$(basename ${LOCAL_WORKSPACE_FOLDER})" "${LOCAL_WORKSPACE_FOLDER}"
+        fi
     fi
 }
 
@@ -84,8 +86,9 @@ function add_secret_text {
 function map_existing_secret_text {
     if [[ ! -f "./${_EXISTING_SECRETS_PATH}/$1" ]]; then
         echo "Existing secret file not found at ${_EXISTING_SECRETS_PATH}/$1."
-        echo "Copy the secret text, then:"
-        echo "- on macOS run in Terminal: pbpaste >${_EXISTING_SECRETS_PATH}/$1"
+        echo "Update following command as needed, and run:"
+        echo
+        echo "echo -n \"[secret text]\" > ${_EXISTING_SECRETS_PATH}/$1"
         exit 1
     fi
     add_secret_text $2 $(<"${_EXISTING_SECRETS_PATH}/$1")
