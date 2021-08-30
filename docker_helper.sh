@@ -57,6 +57,19 @@ function wait_for_docker_container_port {
     done
 }
 
+function wait_for_published_port {
+    echo -n [$1] Waiting for published port $2 ..
+    while :; do
+        nc -zv localhost $2 &>/dev/null && RC=$? || RC=$?
+        if [[ ${RC} -eq 0 ]]; then
+            echo -e ". ${GREEN}done${NC}"
+            break
+        fi
+        echo -n .
+        sleep 1
+    done
+}
+
 function set_elasticsearch_bootstrap_password {
     wait_for_docker_container_file $1 /usr/share/elasticsearch/config/elasticsearch.keystore
     echo -n "Elasticsearch [$1] initializing bootstrap password ... "
