@@ -72,6 +72,7 @@ function clear_env {
 
 function add_env {
     echo -n "$2" >"./${_ENV_VARS_BUILD_PATH}/$1"
+    export "$1=$2"
 }
 
 # Makes both a regular variable as well as a file with the secret contents.
@@ -96,15 +97,14 @@ function fetch_file {
         echo -n "Fetching ${URL} ... "
         wget -P ${_CACHE_PATH} -x ${URL} 1>/dev/null &&
             echo -e "${GREEN}done${NC}" || {
-                echo -e "${RED}failed${NC}" 
-                return 1
-            }
-        add_env "$1_WORKSPACE_FILE" "${CACHED_FILE}" 
+            echo -e "${RED}failed${NC}"
+            return 1
+        }
+        add_env "$1_WORKSPACE_FILE" "${CACHED_FILE}"
     else
         echo "File ${URL} already cached. "
     fi
 }
-
 
 function map_existing_secret_text {
     if [[ ! -f "./${_EXISTING_SECRETS_PATH}/$1" ]]; then
